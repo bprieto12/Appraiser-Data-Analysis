@@ -1,0 +1,74 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+### Exploratory Data Analysis: 2011 Data
+
+```{r,echo=FALSE}
+length(data_2011$Regular.pay) # total number of people in the department
+data.frame(table(data_2011$Job.title)) # number of people with each title
+```
+
+```{r, echo=FALSE}
+data_2011 %>%
+  group_by(Job.title) %>%
+  summarize(min(Regular.pay), mean(Regular.pay), max(Regular.pay))
+```
+
+```{r, echo=FALSE}
+ggplot(aes(x = Regular.pay), data = data_2011) +
+  geom_histogram(bins = 30)
+```
+
+```{r, echo=FALSE}
+ggplot(aes(x = Regular.pay), data = data_2011) +
+  geom_histogram() + 
+  facet_wrap(~ Job.title)
+```
+
+```{r, echo=FALSE}
+# Who is the person that made no money and how were they compensated otherwise?
+ggplot(aes(x = Regular.pay), data = subset(data_2011, Job.title == "AUDITOR-APPRAISER I")) +
+  geom_histogram(bins = 30)
+```
+
+### Observations for Regular Pay:
+
+The total number of people working for the appraiser's department in 2011 was 153.
+Employees with the title of appraiser fall into 12 categories. The mean regular
+salary for all employees with the title appraiser is $72680.  One employee, with
+the title Auditor-Appraiser I was given no Regular Pay.  From the distribution of the 
+Auditor-Appraiser I Regular Pay below, it seems like this entry was a clerical error.
+Additionally, the Principle Audior-Appraiser has the lowest salary with around $709.84.
+
+
+```{r, echo=FALSE}
+# Total Benefits
+
+ggplot(aes(x=Total.benefits), data=data_2011) +
+  geom_histogram(bins=30)
+```
+
+```{r, echo=FALSE}
+data_2011 %>%
+  group_by(Job.title) %>%
+  summarize(min(Total.benefits), mean(Total.benefits), max(Total.benefits))
+```
+
+```{r, echo=FALSE}
+# Grouping the Total Pay
+grouped_pay <- total_data %>%
+  group_by(Job.title, Year) %>%
+  summarize(mean(Total.pay), length(Name), mean(Total.pay)/length(Name))
+
+# Grouping the Total Benefits
+grouped_benefits <- total_data %>%
+  group_by(Job.title, Year) %>%
+  summarize(mean(Total.benefits), length(Name), mean(Total.benefits)/length(Name))
+
+# Writing in better column names
+colnames(grouped_pay) <- c("Job.title", "Year", "Mean.pay", "Num.people", "Mean.pay.per.person")
+colnames(grouped_benefits) <- c("Job.title", "Year", "Mean.benefits", "Num.people", "Mean.benefits.per.person")
+```

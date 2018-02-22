@@ -1,0 +1,372 @@
+
+## Orange County Appraiser Salary Analysis
+
+Author: Brenden Prieto
+
+This notebook explores the trends in salary for employees
+of Orange County's Appraiser's Office from 2011 until 2016.
+The data was extracted from transparentcalifornia.com.
+
+Two statistics are investigated in this report:
+
+1. How has employee compensation for each role changed over the 5 year period? How has real salary changed relative to benefits.
+2. How long does it take for appraiser's at each level to promote to the next level.
+
+In the future, I'd like to examine the total county budget for each of these years and 
+how the demographics of the county appraiser's office has changed.  How many people
+who started in 2011 stayed until 2016? Male vs Female split (this would take a
+while to find because I would need to code the gender of each employee).
+
+```{r, echo=FALSE, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+```
+
+```{r, echo=FALSE}
+# Reading in the data
+data_2011 <- read.csv(file="./data/appraiser_salaries_2011.csv", header=TRUE, sep=",")
+data_2012 <- read.csv(file="./data/appraiser_salaries_2012.csv", header=TRUE, sep=",")
+data_2013 <- read.csv(file="./data/appraiser_salaries_2013.csv", header=TRUE, sep=",")
+data_2014 <- read.csv(file="./data/appraiser_salaries_2014.csv", header=TRUE, sep=",")
+data_2015 <- read.csv(file="./data/appraiser_salaries_2015.csv", header=TRUE, sep=",")
+data_2016 <- read.csv(file="./data/appraiser_salaries_2016.csv", header=TRUE, sep=",")
+```
+
+```{r, echo=FALSE}
+# Helper function for cleaning the datasets
+clean_data <- function(df, year) {
+  df <- df[df$Name != "",] # Deleting empty rows
+  df$Regular.pay <- as.numeric(gsub("\\$|,", "", df$Regular.pay))
+  df$Overtime.pay <- as.numeric(gsub("\\$|,", "", df$Overtime.pay))
+  df$Other.pay <- as.numeric(gsub("\\$|,", "", df$Other.pay))
+  df$Total.pay <- as.numeric(gsub("\\$|,", "", df$Total.pay))
+  df$Total.benefits <- as.numeric(gsub("\\$|,", "", df$Total.benefits))
+  df$Total.pay...benefits <- as.numeric(gsub("\\$|,", "", df$Total.pay...benefits))
+  
+  # Cleaning the Job titles
+  df$Job.title <- toupper(gsub(paste("\n\t\t\t\t\tOrange County,", year, sep=' '), "", df$Job.title))
+  
+  # Adding a year to each sample
+  df$Year <- rep.int(as.integer(year), length(df$Job.title))
+  
+  ## Cleaning the Names
+  df$Name <- toupper(df$Name)
+  comma_idxs <- grepl(pattern=",", x = df$Name)
+  comma_names <- df$Name[comma_idxs]
+  df$Name[comma_idxs] <- sapply(strsplit(comma_names, ", "), function(x) paste(x[2], x[1]))
+  df$Name <- sapply(strsplit(as.character(df$Name), " "), function(x) paste(x[1], x[length(x)]))
+  return(df)
+}
+```
+
+```{r, echo=FALSE}
+# Cleaning the data
+data_2011 <- clean_data(data_2011, "2011")
+data_2012 <- clean_data(data_2012, "2012")
+data_2013 <- clean_data(data_2013, "2013")
+data_2014 <- clean_data(data_2014, "2014")
+data_2015 <- clean_data(data_2015, "2015")
+data_2016 <- clean_data(data_2016, "2016")
+
+# Combining the data into one dataset
+total_data <- do.call(rbind, list(data_2011,data_2012,data_2013,data_2014,data_2015,data_2016))
+```
+
+#### Question 1: How has compensation changed over time for each position in appraisal?
+
+To answer this question, the total pay and the total benefits will be grouped by job title and year.
+Then, the data will be plotted independently and finally together to get a larger view of the changes.
+
+```{r, echo=FALSE}
+# adding total pay bins to the data
+
+start <- min(total_data$Total.pay)
+end <- as.integer(max(total_data$Total.pay) + 1)
+splits <- as.integer(end / 4)
+
+total_data$total.pay.bin <- cut(total_data$Total.pay, breaks=c(start, start + splits, start + 2*splits, start + 3*splits, end))
+
+# adding total benefit bins to the data
+start <- min(total_data$Total.benefits)
+end <- as.integer(max(total_data$Total.benefits) + 1)
+splits <- as.integer((end - start) / 4)
+
+total_data$total.benefits.bin <- cut(total_data$Total.benefits, breaks=c(start, start + splits, start + 2*splits, start + 3*splits, end))
+```
+
+#### Analysis of Appraiser I
+
+Appraiser I is the first position to which a trainee is promoted.  Here, and in each of the following
+sections, total pay, total benefits, and promotion statistics will be explored.
+
+##### Total Pay
+
+```{r, echo=FALSE}
+## Plotting boxplots for Appraiser I
+ggplot(aes(x=factor(Year), y=Total.pay), data=subset(total_data, Job.title == "APPRAISER I")) +
+  geom_boxplot() +
+  ggtitle("Boxplots for Appraiser I Total Pay by Year")
+```
+
+```{r, echo=FALSE}
+ggplot(aes(factor(Year), fill=total.pay.bin), data=subset(total_data, Job.title == "APPRAISER I")) +
+  geom_bar() +
+  ggtitle("Number of Appraiser I's by year")
+```
+
+###### Observations from Appraiser I Total Pay:
+
+There is an odd dip from 2013 to 2014 in the total pay.  In 2014 the plot suggests
+that many people with the largest salaries left for some reason (e.g. they 
+were promoted, they quit, or they were laid off) and that many people were brought in 
+with a lower salary than the average for the previous years.  While the distribution
+for 2014 at the 3rd quartile extends to the first quartile of 2013, the mean is drawn
+down to below $50,000.  The boxplot for 2015 suggest that the previous year's new recruits
+got a raise or left because the minimum no longer reaches below $50,000. For 2016 it seems
+like the entire population of Appraiser I employees were new recruits.
+
+##### Total Benefits
+
+```{r, echo=FALSE}
+## Plotting boxplots for Appraiser I
+ggplot(aes(x=factor(Year), y=Total.benefits), data=subset(total_data, Job.title == "APPRAISER I")) +
+  geom_boxplot() +
+  ggtitle("Boxplots for Appraiser I Total Benefits by Year")
+```
+```{r, echo=FALSE}
+ggplot(aes(factor(Year), fill=total.benefits.bin), data=subset(total_data, Job.title == "APPRAISER I")) +
+  geom_bar() +
+  ggtitle("Number of Appraiser I's by Year for Benefits")
+```
+
+```{r, echo=FALSE}
+########################################################
+############  Helper Functions For Promotions ###########
+#########################################################
+
+# Function: set.intersection
+# Returns: the intersection of two lists
+# Fields: a = list, b = list
+
+set.intersection <- function(a, b) {
+  intersect <- vector()
+   
+  for (i in 1:length(a)) {
+    if (a[i] %in% b) {
+      intersect <- append(intersect, a[i])
+    }
+  }
+  return(intersect)
+}
+
+# Function to find the distribution of the amount of time it
+# took for employees to transition from one title to another
+
+time.to.promotion.distribution <- function(position1, position2, df) {
+  initial.position <- df[df$Job.title == position1,]
+  promoted.position <- df[df$Job.title == position2,]
+  promoted.people <- set.intersection(initial.position$Name, promoted.position$Name)
+  
+  years.to.promotion <- vector()
+
+  for (i in 1:length(promoted.people)) {
+    name <- promoted.people[i]
+    promotion.year <- promoted.position$Year[promoted.position$Name == name][1]
+    start.year <- initial.position$Year[initial.position$Name == name][1]
+    years.to.promotion <- append(years.to.promotion, promotion.year - start.year)
+  }
+  return(years.to.promotion)
+}
+
+## Function that finds the number of people for each
+## job
+
+total.num.workers <- function(position, df) {
+  num.workers <- df[df$Job.title == position,]
+  return(length(num.workers$Name))
+}
+
+## Function that finds the number of people who get promoted
+## from one position to another
+
+num.workers.promoted <- function(position1, position2, df) {
+  initial.position <- df[df$Job.title == position1,]
+  promoted.position <- df[df$Job.title == position2,]
+  promoted.people <- set.intersection(initial.position$Name, promoted.position$Name)
+  return(length(promoted.people))
+}
+
+## Function: mean.years.to.promotion
+
+summary.of.years.to.promotion <- function(distribution) {
+  return(summary(distribution))
+}
+```
+
+##### Examining Promotion Data For Appraiser Trainee's to Appraiser I
+
+From the data we can see that there was at one time 25 Appraiser Trainees and
+15 were promoted to Appraiser I (60% promotion rate).  As the
+histogram shows below, for those people who were promoted, they took at most
+one year to become an Appraiser I.
+
+```{r, echo=FALSE}
+
+trainer.to.appraiser <- time.to.promotion.distribution("APPRAISER TRAINEE", "APPRAISER I", total_data)
+zero.to.one.df <- data.frame(trainer.to.appraiser)
+
+total.num.workers("APPRAISER TRAINEE", total_data)
+num.workers.promoted("APPRAISER TRAINEE", "APPRAISER I", total_data)
+num.workers.promoted("APPRAISER TRAINEE", "APPRAISER I", total_data) / total.num.workers("APPRAISER TRAINEE", total_data)
+
+ggplot(aes(x = trainer.to.appraiser), data=zero.to.one.df) +
+  geom_histogram(binwidth = 0.5) +
+  ggtitle("Histogram of Number of Years from Appraiser Trainee to Appraiser I") +
+  xlab("Number of Years") +
+  ylab("Number of People")
+```
+
+###### Observations from Total Benefits
+
+The boxplots show that the benefits mirror the dipping effect in 2014 with the
+steady rise afterward.
+
+#### Analysis of Appraiser II
+
+##### Total Pay
+```{r, echo=FALSE}
+## Plotting boxplots for Appraiser II
+ggplot(aes(x=factor(Year), y=Total.pay), data=subset(total_data, Job.title == "APPRAISER II")) +
+  geom_boxplot() +
+  ggtitle("Boxplots for Appraiser II Total Pay by Year")
+```
+
+The outliers of this data make the trend in this data less apparent.  The next plot shows
+the boxplots without outliers.
+
+```{r, echo=FALSE}
+## Plotting boxplots for Appraiser II
+ggplot(aes(x=factor(Year), y=Total.pay), data=subset(total_data, Job.title == "APPRAISER II")) +
+  geom_boxplot() +
+  ylim(65000, 100000) +
+  ggtitle("Boxplots for Appraiser II Total Pay by Year")
+```
+
+```{r, echo=FALSE}
+ggplot(aes(factor(Year), fill=total.pay.bin), data=subset(total_data, Job.title == "APPRAISER II")) +
+  geom_bar() +
+  ggtitle("Number of Appraiser II's by Year for Pay")
+```
+
+##### Total Benefits
+
+```{r, echo=FALSE}
+ggplot(aes(x=factor(Year), y=Total.benefits), data=subset(total_data, Job.title == "APPRAISER II")) +
+  geom_boxplot() +
+  ggtitle("Boxplots for Appraiser II Total Benefits by Year")
+```
+
+```{r, echo=FALSE}
+ggplot(aes(factor(Year), fill=total.benefits.bin), data=subset(total_data, Job.title == "APPRAISER II")) +
+  geom_bar() +
+  ggtitle("Number of Appraiser II's by Year for Benefits")
+```
+
+###### Observations from Appraiser II Plots:
+
+The number of employees and their respective salaries are far less variable for 
+Appraiser II's than Appraiser I's.  Again, the plots show a dip in mean salaries
+in 2014.  The bar chart reveals that the exit one the employee that made close to
+$100,000 had a significant effect on the change in the mean.  Overall, it appears
+as if Total Pay for Appraiser II's is increasing.
+
+##### Examining Promotion Data For Appraiser I to Appraiser II
+
+From the data we can see that there was at one time 72 Appraiser I and
+60 were promoted to Appraiser II (83.33% promotion rate).  As the
+histogram shows below, for those people who were promoted, they took at most
+one year to become an Appraiser I.  The mean number of years to promotion
+is 2.93 and the median is 3.
+
+```{r, echo=FALSE}
+appraiser.1.to.appraiser.2 <- time.to.promotion.distribution("APPRAISER I", "APPRAISER II", total_data)
+one.to.two.df <- data.frame(appraiser.1.to.appraiser.2)
+
+total.num.workers("APPRAISER I", total_data)
+num.workers.promoted("APPRAISER I", "APPRAISER II", total_data)
+num.workers.promoted("APPRAISER I", "APPRAISER II", total_data) / total.num.workers("APPRAISER I", total_data)
+summary.of.years.to.promotion(appraiser.1.to.appraiser.2)
+
+ggplot(aes(x = appraiser.1.to.appraiser.2), data=one.to.two.df) +
+  geom_histogram(binwidth = 0.5) +
+  ggtitle("Histogram of Number of Years from Appraiser I to Appraiser II") +
+  xlab("Number of Years") +
+  ylab("Number of People")
+```
+
+#### Analysis of Appraiser III
+
+##### Total Pay
+```{r, echo=FALSE}
+## Plotting boxplots for Appraiser II
+ggplot(aes(x=factor(Year), y=Total.pay), data=subset(total_data, Job.title == "APPRAISER III")) +
+  geom_boxplot() +
+  ylim(65000, 100000) +
+  ggtitle("Boxplots for Appraiser III Total Pay by Year")
+```
+
+```{r, echo=FALSE}
+ggplot(aes(factor(Year), fill=total.pay.bin), data=subset(total_data, Job.title == "APPRAISER III")) +
+  geom_bar() +
+  ggtitle("Number of Appraiser III's by Year for Pay")
+```
+
+###### Observations for Total Pay:
+
+Clearly more investigation needs to occur. In 2013, around one quarter of the 
+Appraiser III's made close to $100,000, and by 2014 there are none.  We
+start to see larger salaries pop up again in 2016 which suggests there will
+be more next year.
+
+##### Total Benefits
+
+```{r, echo=FALSE}
+## Plotting boxplots for Appraiser II
+ggplot(aes(x=factor(Year), y=Total.benefits), data=subset(total_data, Job.title == "APPRAISER III")) +
+  geom_boxplot() +
+  ylim(20000, 50000) +
+  ggtitle("Boxplots for Appraiser III Total Benefits by Year")
+```
+```{r, echo=FALSE}
+ggplot(aes(factor(Year), fill=total.benefits.bin), data=subset(total_data, Job.title == "APPRAISER III")) +
+  geom_bar() +
+  ggtitle("Number of Appraiser III's by Year for Benefits")
+```
+
+##### Examining Promotion Data For Appraiser II to Appraiser III
+
+From the data we can see that there was at one time 263 Appraiser II and
+31 were promoted to Appraiser II (11.78% promotion rate).  The median
+number of years to promotion was 4 and the mean was 3.29.
+
+```{r, echo=FALSE}
+appraiser.2.to.appraiser.3 <- time.to.promotion.distribution("APPRAISER II", "APPRAISER III", total_data)
+appraiser.2.to.appraiser.3 <- appraiser.2.to.appraiser.3[appraiser.2.to.appraiser.3 > 0]
+two.to.three.df <- data.frame(appraiser.2.to.appraiser.3)
+colnames(two.to.three.df) <- c("num.years")
+
+total.num.workers("APPRAISER II", total_data)
+num.workers.promoted("APPRAISER II", "APPRAISER III", total_data)
+num.workers.promoted("APPRAISER II", "APPRAISER III", total_data) / total.num.workers("APPRAISER II", total_data)
+summary.of.years.to.promotion(appraiser.2.to.appraiser.3)
+
+ggplot(aes(x = num.years), data=two.to.three.df) +
+  geom_histogram(binwidth = 0.5) +
+  ggtitle("Histogram of Number of Years from Appraiser II to Appraiser III") +
+  xlab("Number of Years") +
+  ylab("Number of People")
+```
+
+
+
